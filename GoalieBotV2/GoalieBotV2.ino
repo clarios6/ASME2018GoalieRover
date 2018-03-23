@@ -1,15 +1,32 @@
-/* Goalie code for ASME */
+/*
+ * =====GOALIE CODE FOR CSULA ASME=====
+ * Made by Carlos Larios-Solis with the
+ * guidance of Adryel Arizaga
+ */
 #include <SPI.h>
 #include <PS3BT.h>
 #include <math.h>
+#include <Servo.h>
 
 
-
-//=====PIN DEFINING=====
+/*
+ * =====MOTOR SETUP INFO=====
+ */
 const byte mtrRF [3] = {22,23,10}; // Right-Front Motor pins
-const byte mtrRB [3] = {29,28,8}; // Right Back Motor pins
-const byte mtrLF [3] = {36,37,6}; // Left Front Motor pins
-const byte mtrLB [3] = {44,45,4}; // Left Back Motor pinsmotor
+const byte mtrRB [3] = {29,28,8};  // Right Back Motor pins
+const byte mtrLF [3] = {36,37,6};  // Left Front Motor pins
+const byte mtrLB [3] = {44,45,4};  // Left Back Motor pinsmotor
+
+/*
+ * =====SERVO SETUP INFO=====
+ */
+const int leftServoPin = 3; //Left Servo Pin
+const int rightServoPin = 2; //Right Servo Pin
+int lServPos = 90;
+int rServPos = 90;
+int servSpeed = 10; //Servo speed
+Servo leftServo;
+Servo rightServo;
 
 USB Usb;
 BTD Btd(&Usb);
@@ -17,7 +34,7 @@ PS3BT PS3(&Btd);
 
 void setup() {
   Serial.begin(9600);    //initialize serial @ 9600 baudrate
-  pinMode(mtrRF[0], OUTPUT); //Defining Pins
+  pinMode(mtrRF[0], OUTPUT); //Defining motor Pins
   pinMode(mtrRF[1], OUTPUT);
   
   pinMode(mtrRB[0], OUTPUT);
@@ -28,7 +45,9 @@ void setup() {
 
   pinMode(mtrLB[0], OUTPUT);
   pinMode(mtrLB[1], OUTPUT);
-  
+
+  leftServo.attach(leftServoPin);
+  rightServo.attach(rightServoPin);
   
   if (Usb.Init() == -1) {
     Serial.print(F("\r\nOSC did not start"));
@@ -40,9 +59,9 @@ void setup() {
 }
 
 bool isConnected = false;
-int x;
-int y;
-int octodrant; //angle of x and y from the positive x-axis
+//int x;
+//int y;
+//int octodrant; //angle of x and y from the positive x-axis
 
 void loop() {
   Usb.Task();
@@ -57,17 +76,15 @@ void loop() {
 
    /*
     * =====SERVO MOVEMENT=====
-    
-    if(PS3.getButtonPress()){
-      
-    } else if(PS3.getButtonPress()){
-      
-    } else if(PS3.getButtonPress()){
-      
-    } else
     */
+    if(PS3.getButtonPress(TRIANGLE)){
+      servoUp();
+    } else if(PS3.getButtonPress(CROSS)){
+      servoDown();
+    }
+    
     /*
-     * =====ROTATIONAL / NO MOVEMENT=====
+     * =====ROTATIONALMOVEMENT=====
      */
       
     if (PS3.getButtonPress(L2)){ //rotate counter-clockwise at half speed
@@ -80,106 +97,74 @@ void loop() {
       /*
        * =====REGULAR MOVEMENT=====
        */
-      if (PS3.getButtonPress(RIGHT)){         //right movement
-        right();
-        
-      } else if (PS3.getButtonPress(UP)){   //forward movement
-        forward();
-        
-      } else if (PS3.getButtonPress(LEFT)){  //Left Movement
+      if (PS3.getButtonPress(UP)){            //Forward movement
+
+        if(PS3.getButtonPress(LEFT)){         //Forward Left Movement
+          forwardLeft();
+        } else if(PS3.getButtonPress(RIGHT)){ //Forward Right Movement
+          forwardRight();
+        } else {
+          forward();
+        }
+      } else if (PS3.getButtonPress(DOWN)){   //Backward movement
+
+        if(PS3.getButtonPress(LEFT)){         //Backward Left Movement
+          backRight();
+        } else if(PS3.getButtonPress(RIGHT)){ //Backward Right Movement
+          backLeft();
+        } else{
+          backwards();
+        }
+      } else if (PS3.getButtonPress(LEFT)){   //Left Movement
         left();
   
-      } else if (PS3.getButtonPress(DOWN)){  //Backwards Movement
-        backwards();
-      } 
-       /*
-       * =====OMNIDIRECTIONAL MOVEMENT=====
-       */
-        else if (PS3.getButtonPress(TRIANGLE)){ // Forward Right Movement
-        forwardRight();
-        
-      } else if (PS3.getButtonPress(CIRCLE)){ // Forward Left Movement
-        forwardLeft();
-        
-      } else if (PS3.getButtonPress(SQUARE)){ // Backward Left Movement
-        backLeft();
-        
-      } else if (PS3.getButtonPress(TRIANGLE)){ // Backward Right Movement
-        backRight();
-      } else {
+      } else if (PS3.getButtonPress(RIGHT)){  //Right Movement
+        right();
+      }  else {
         stopAll();
       }
-      
     }
   }  
 }
 
 
-int getOctodrant(int x, int y){
-  int theta = getAngle(x, y);
-  int oct = 0;
-  if(theta >= 345 && theta <= 15){
-    oct= 1;
-  } else if(theta > 15 && theta < 75){
-    oct = 2;
-  } else if(theta >= 75 && theta <= 105){
-    oct = 3;
-  } else if(theta > 105 && theta < 165){
-    oct = 4;
-  } else if(theta >= 165 && theta <= 195){
-    oct = 5;
-  } else if(theta > 195 && theta < 255){
-    oct = 6;
-  } else if(theta >= 255 && theta <= 285){
-    oct = 7;
-  } else if(theta > 285 && theta < 345){
-    oct = 8;
-  }
-
-  return oct;  
-}
-
-
-/* converts cartesian coordinates to just the polar angle in degrees, not radians
- * Adds 0.5 to each angle so that when it is cast to int it is rounded to the right angle
+/*
+ * =====SERVO MOVEMENT FUNCTIONS=====
  */
-int getAngle(int x, int y){
-  double cTheta = atan(2 / 2) * (360 / (2 * M_PI));
-  int quadrant = findQuadrant(x, y);
-  if(quadrant == 1 || quadrant == 5){
-    cTheta += 0.5;
-  } else if(quadrant == 2){
-    cTheta += 180.5;
-  } else if (quadrant == 3){
-    cTheta += 180.5;
-  } else{
-    cTheta += 360.5;
-  }
-  int degree = (int)cTheta;
-  return degree;
+
+void servoUp(){
+  lServPos = incServo(lServPos);
+  rServPos = lServPos;
+  leftServo.write(lServPos);
+  rightServo.write(rServPos);
 }
 
-/* Finds the quadrant in which the coordinates x and y lie in
- *returns appropriate quadrant
+void servoDown(){
+  lServPos = decServo(lServPos);
+  rServPos = lServPos;
+  leftServo.write(lServPos);
+  rightServo.write(rServPos);
+}
+
+int incServo(int pos){
+  pos += servSpeed;
+  if(pos > 180){
+    pos = 180;
+  }
+  return pos;
+}
+
+int decServo(int pos){
+  pos -= servSpeed;
+  if(pos < 0){
+    pos = 0;
+  }
+  return pos;
+}
+
+/*
+ * =====MOTOR MOVEMENT FUNCTIONS=====
  */
-int findQuadrant(int x, int y){
-  if( x > 0 && y >0 ){ //checks to see if in first quadrant
-    return 1;
-  } else if (x < 0 && y > 0){ //checks to see if in second quadrant
-    return 2;
-  } else if (x < 0 && y < 0){ //checks to see if in third quadrant
-    return 3;
-  } else { //defaults to fourth quadrant
-    return 4;
-  }
-}
-
-int getRadius(int x, int y){
-  double radiusD = sqrt(pow(x, 2) + pow(y, 2)); 
-}
-
-
-//=====MOTOR MOVEMENT FUNCTIONS=====
 void neutral () {
   Serial.print("\nNeutral");
   digitalWrite(mtrRF[0], LOW);
@@ -368,7 +353,72 @@ void rotateCounter() {
   digitalWrite(mtrLB[1], HIGH);
 }
 
+/*
+ * =====DEPRECIATED CODE=====
+ */
 
+int getOctodrant(int x, int y){
+  int theta = getAngle(x, y);
+  int oct = 0;
+  if(theta >= 345 && theta <= 15){
+    oct= 1;
+  } else if(theta > 15 && theta < 75){
+    oct = 2;
+  } else if(theta >= 75 && theta <= 105){
+    oct = 3;
+  } else if(theta > 105 && theta < 165){
+    oct = 4;
+  } else if(theta >= 165 && theta <= 195){
+    oct = 5;
+  } else if(theta > 195 && theta < 255){
+    oct = 6;
+  } else if(theta >= 255 && theta <= 285){
+    oct = 7;
+  } else if(theta > 285 && theta < 345){
+    oct = 8;
+  }
+
+  return oct;  
+}
+
+
+/* converts cartesian coordinates to just the polar angle in degrees, not radians
+ * Adds 0.5 to each angle so that when it is cast to int it is rounded to the right angle
+ */
+int getAngle(int x, int y){
+  double cTheta = atan(2 / 2) * (360 / (2 * M_PI));
+  int quadrant = findQuadrant(x, y);
+  if(quadrant == 1 || quadrant == 5){
+    cTheta += 0.5;
+  } else if(quadrant == 2){
+    cTheta += 180.5;
+  } else if (quadrant == 3){
+    cTheta += 180.5;
+  } else{
+    cTheta += 360.5;
+  }
+  int degree = (int)cTheta;
+  return degree;
+}
+
+/* Finds the quadrant in which the coordinates x and y lie in
+ *returns appropriate quadrant
+ */
+int findQuadrant(int x, int y){
+  if( x > 0 && y >0 ){ //checks to see if in first quadrant
+    return 1;
+  } else if (x < 0 && y > 0){ //checks to see if in second quadrant
+    return 2;
+  } else if (x < 0 && y < 0){ //checks to see if in third quadrant
+    return 3;
+  } else { //defaults to fourth quadrant
+    return 4;
+  }
+}
+
+int getRadius(int x, int y){
+  double radiusD = sqrt(pow(x, 2) + pow(y, 2)); 
+}
 
 
 
