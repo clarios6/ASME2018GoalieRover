@@ -1,2 +1,6 @@
 # ASME2018GoalieRover
-This is the code for a rover/robot type of deal for ASME.
+This is the code for an omniwheel goalie 
+The other code is for little distractor robot that is controlled by an 
+android phone 
+
+
