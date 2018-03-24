@@ -107,7 +107,7 @@ void loop() {
       } else if (PS3.getButtonPress(TRIANGLE)){ // Backward Right Movement
         backRight();
       } else {
-        stopAll();
+        neutral();
       }
       
     }
